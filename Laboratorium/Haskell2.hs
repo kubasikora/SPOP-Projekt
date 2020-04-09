@@ -31,16 +31,11 @@ find name (Directory dir content) = foldl (||) False (map (find name) content)
 systemu plików. Jeśli taki plik istnieje, funkcja zwraca ścieżkę do
 tego pliku postaci "nazwa katalogu/nazwa katalogu/.../nazwa pliku". -}
 
--- search' :: String -> FSObject -> Maybe String
--- search' name (File f) = if f == name then Just name else Nothing
--- search' name (Directory dir content) = searchName' name "/" (Directory dir content)
---     where searchName' name acc (Directory dir content) = Just (acc ++ dir ++ "/" ++ (foldl (safeConcat) "" (map (search name) content)))
-
-
 search :: String -> FSObject -> Maybe String
 search name (File f) = if f == name then Just name else Nothing
 search name dir = findFile name "" dir
     where takeFirst [] = Nothing
           takeFirst (x:xs) = x
-          findFile name acc (File f) = if f == name then Just (acc ++ "/" ++ f) else Nothing
-          findFile name acc (Directory dir content) = takeFirst (filter (\z -> z /= Nothing) (map (findFile name (acc ++ "/" ++ dir)) content))
+          (^^) z = z /= Nothing
+          findFile name acc (File f) = if f == name then Just (acc ++ f) else Nothing
+          findFile name acc (Directory dir content) = takeFirst $ filter (^^) (map (findFile name (acc ++ dir ++ "/")) content)
