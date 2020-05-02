@@ -6,7 +6,7 @@ type Board = [[Cell]]
 
 type Clue = Maybe Int
 
-data CluesSet = Clues [Clue] [Clue] [Clue] [Clue] -- upper right bottom left
+data CluesSet = Clues [Clue] [Clue] [Clue] [Clue] deriving Show -- upper right bottom left
 
 left :: [Clue]
 left = [Nothing, Nothing, Just 4, Nothing]
@@ -125,15 +125,41 @@ fillSquare board clues (row, column) = let size = length board
                                                    checkNextBoard (x:xs) = (if isValidBoard x clues then fillSquare x clues nextCell else []) ++ checkNextBoard xs
                                                in checkNextBoard nextBoards 
 
+convertNumberToClue :: Int -> Clue
+convertNumberToClue num = if num == 0 then Nothing else Just num
+
+askForClues :: IO [Clue]
+askForClues = do line <- getLine
+                 let numbers = map read $ words line :: [Int]
+                 let clues = map convertNumberToClue numbers
+                 return clues
+
+askForCluesSet :: IO CluesSet
+askForCluesSet = do putStrLn "Podaj wskazówki, jeśli nie istnieje wpisz 0"
+                    putStrLn "Podaj górne wskazówki: "
+                    upper <- askForClues
+                    putStrLn "Podaj prawe wskazówki: "
+                    right <- askForClues
+                    putStrLn "Podaj dolne wskazówki: "
+                    bottom <- askForClues
+                    putStrLn "Podaj lewe wskazówki: "
+                    left <- askForClues
+                    return (Clues upper right bottom left)
+
+askForBoardSize :: IO Int
+askForBoardSize = do putStrLn "Podaj rozmiar planszy:"
+                     line <- getLine
+                     let size = read (takeWhile (/=' ') line) :: Int
+                     return size
+
 -- main - pobierz plansze od użytkownika i rozwiąż łamigłówkę
 main :: IO ()
-main = do
-    putStrLn "SPOP-Projekt: Piramidy"
-    putStrLn "Podaj rozmiar planszy:"
-    line <- getLine
-    let size = (read (takeWhile (/= ' ') line) :: Int)
-    let board = createEmptyBoard size
-    -- let clues = Clues [Just 3, Nothing, Just 1, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Nothing, Nothing, Nothing] [Nothing, Nothing, Just 4, Nothing]
-    let clues = Clues [Nothing, Nothing, Nothing, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Just 2, Nothing, Just 2] [Nothing, Nothing, Just 4, Nothing]
-    let solutions = fillSquare board clues (0,0) -- zacznij od elementu (0,0) 
-    print solutions
+main = do putStrLn "SPOP-Projekt: Piramidy"
+          size <- askForBoardSize
+          clues <- askForCluesSet
+          let board = createEmptyBoard size
+          -- let clues = Clues [Just 3, Nothing, Just 1, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Nothing, Nothing, Nothing] [Nothing, Nothing, Just 4, Nothing]
+          -- let clues = Clues [Nothing, Nothing, Nothing, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Just 2, Nothing, Just 2] [Nothing, Nothing, Just 4, Nothing]
+        --   let clues = Clues [Just 1, Just 2, Just 3, Just 2] [Just 4, Just 1, Just 2, Just 2] [Just 2, Just 2, Just 1, Just 3] [Just 1, Just 4, Just 2, Just 2]   
+          let solutions = fillSquare board clues (0,0) -- zacznij od elementu (0,0) 
+          print (head solutions)
