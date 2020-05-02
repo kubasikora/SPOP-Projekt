@@ -1,5 +1,5 @@
 # SPOP-Projekt
-Projekt i laboratoriium z przedmiotu SPOP - Specyfikacje formalne i programy funkcyjne
+Projekt i laboratorium z przedmiotu SPOP - Specyfikacje formalne i programy funkcyjne
 
 ## Zadanie projektowe
 
