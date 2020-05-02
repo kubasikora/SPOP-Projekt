@@ -1,15 +1,12 @@
 module Main where
 
-type Cell = Int
+type Cell = Int -- komórka planszy, zwykła liczba wskazująca wysokość budynku
 
-type Board = [[Cell]]
+type Board = [[Cell]] -- typ planszy, macierz komórek
 
-type Clue = Maybe Int
+type Clue = Maybe Int -- wskazówka, może jej nie być
 
-data CluesSet = Clues [Clue] [Clue] [Clue] [Clue] deriving Show -- upper right bottom left
-
-left :: [Clue]
-left = [Nothing, Nothing, Just 4, Nothing]
+data CluesSet = Clues [Clue] [Clue] [Clue] [Clue] deriving Show -- zestaw wskazówek, po kolei: góra prawe dolne lewe
 
 -- funkcja służąca do obliczenia ile piramid jest widocznych w danym rzędzie
 getVisiblePyramids :: [Cell] -> Int
@@ -81,18 +78,18 @@ checkRowsForUniqueness board = nextRow board (size - 1)
                                      nextRow board 0 = isRowValid (board !! 0)
                                      nextRow board index = isRowValid (board !! index) && nextRow board (index - 1)
                                  
--- sprawdz czy dana plansza jest poprawna, na razie wartosci unikalne w wierszach i kolumnach
+-- sprawdz czy dana plansza jest poprawna, po kolei sprawdz czy spełnione są wskazówki a potem czy wartości w wierszach/kolumnach są unikalne
 isValidBoard :: Board -> CluesSet -> Bool 
 isValidBoard board (Clues u r b l) = let areRowsValid = checkRowsForUniqueness board
-                                         areColsValid = checkRowsForUniqueness (transpose board) 
+                                         areColsValid = checkRowsForUniqueness (transpose board) -- aby sprawdzic kolumny -> transpozycja planszy
                                          areLeftCluesMet = checkLeftClues board l
                                          areRightCluesMet = checkRightClues board r
                                          areUpperCluesMet = checkUpperClues board u
                                          areBottomCluesMet = checkBottomClues board b
                                          areCluesMet = areLeftCluesMet && areRightCluesMet && areUpperCluesMet && areBottomCluesMet
-                                     in areRowsValid && areColsValid && areCluesMet
+                                     in areCluesMet && areRowsValid && areColsValid 
 
--- oblicz nastepny wymieniany element
+-- oblicz pozycję nastepnego wymienianego elementu
 nextPosition :: Int -> (Int, Int) -> (Int, Int)
 nextPosition size (row, column) = if column + 1 == size then (row + 1, 0)
                                else (row, column + 1)
@@ -115,7 +112,7 @@ createPossibleBoards board position = createNext board position (length board)
                                       where createNext _ _ 0 = []
                                             createNext board pos n = [replaceValueInBoard board pos n] ++ createNext board pos (n-1) 
 
--- stworz liste mozliwych rozwiazan
+-- wypełnij jedną komórkę planszy - rekurencyjna implementacja algorytmu przeszukiwania wgłąb
 fillSquare :: Board -> CluesSet -> (Int, Int) -> [Board]
 fillSquare board clues (row, column) = let size = length board
                                        in if row == size then [board]
@@ -125,17 +122,21 @@ fillSquare board clues (row, column) = let size = length board
                                                    checkNextBoard (x:xs) = (if isValidBoard x clues then fillSquare x clues nextCell else []) ++ checkNextBoard xs
                                                in checkNextBoard nextBoards 
 
+-- skonwertuj otrzymaną liczbę na typ wskazówki
 convertNumberToClue :: Int -> Clue
 convertNumberToClue num = if num == 0 then Nothing else Just num
 
+-- pobierz pojedyncza liste wskazowek dla jednego boku 
 askForClues :: IO [Clue]
 askForClues = do line <- getLine
                  let numbers = map read $ words line :: [Int]
                  let clues = map convertNumberToClue numbers
                  return clues
 
+-- pobierz zestaw wskazowek od uzytkownika
 askForCluesSet :: IO CluesSet
 askForCluesSet = do putStrLn "Podaj wskazówki, jeśli nie istnieje wpisz 0"
+                    putStrLn "Wskazówki podawaj w kolejności od lewej do prawej/z góry na dół"
                     putStrLn "Podaj górne wskazówki: "
                     upper <- askForClues
                     putStrLn "Podaj prawe wskazówki: "
@@ -146,6 +147,7 @@ askForCluesSet = do putStrLn "Podaj wskazówki, jeśli nie istnieje wpisz 0"
                     left <- askForClues
                     return (Clues upper right bottom left)
 
+-- pobierz rozmiar planszy od uzytkownika
 askForBoardSize :: IO Int
 askForBoardSize = do putStrLn "Podaj rozmiar planszy:"
                      line <- getLine
@@ -155,11 +157,8 @@ askForBoardSize = do putStrLn "Podaj rozmiar planszy:"
 -- main - pobierz plansze od użytkownika i rozwiąż łamigłówkę
 main :: IO ()
 main = do putStrLn "SPOP-Projekt: Piramidy"
-          size <- askForBoardSize
-          clues <- askForCluesSet
-          let board = createEmptyBoard size
-          -- let clues = Clues [Just 3, Nothing, Just 1, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Nothing, Nothing, Nothing] [Nothing, Nothing, Just 4, Nothing]
-          -- let clues = Clues [Nothing, Nothing, Nothing, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Just 2, Nothing, Just 2] [Nothing, Nothing, Just 4, Nothing]
-        --   let clues = Clues [Just 1, Just 2, Just 3, Just 2] [Just 4, Just 1, Just 2, Just 2] [Just 2, Just 2, Just 1, Just 3] [Just 1, Just 4, Just 2, Just 2]   
+          size <- askForBoardSize -- popros uzytkownika o wielkosc planszy
+          clues <- askForCluesSet -- popros uzytkownika o wskazowki
+          let board = createEmptyBoard size -- stworz pustą planszę
           let solutions = fillSquare board clues (0,0) -- zacznij od elementu (0,0) 
-          print (head solutions)
+          print (head solutions) -- fill square zwraca listę rozwiazan, wyswietl pierwsze (i jedyne) 
