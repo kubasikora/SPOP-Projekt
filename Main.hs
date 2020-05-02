@@ -1,7 +1,56 @@
 module Main where
 
 type Cell = Int
+
 type Board = [[Cell]]
+
+type Clue = Maybe Int
+
+data CluesSet = Clues [Clue] [Clue] [Clue] [Clue] -- upper right bottom left
+
+left :: [Clue]
+left = [Nothing, Nothing, Just 4, Nothing]
+
+-- funkcja służąca do obliczenia ile piramid jest widocznych w danym rzędzie
+getVisiblePyramids :: [Cell] -> Int
+getVisiblePyramids row = let nextPyramid [] height acc = acc
+                             nextPyramid (x:xs) height acc = if x > height then nextPyramid xs x (acc+1)
+                                                             else nextPyramid xs height acc
+                         in nextPyramid row 0 0  
+
+-- wyciagnij wartosc z just 
+fromJust :: Maybe a -> a 
+fromJust (Just x) = x
+
+-- sprawdz czy dany wiersz jest zgodny ze wskazówką, jesli rzad jest jeszcze nieskonczony to jest poprawny
+checkRowClue :: [Cell] -> Clue -> Bool
+checkRowClue row clue = if clue == Nothing || elem 0 row then True
+                        else getVisiblePyramids row == fromJust clue
+
+-- sprawdz wszystkie wskazowki z lewej strony -> wskazowka | wiersz
+checkLeftClues :: Board -> [Clue] -> Bool
+checkLeftClues board clues = let nextRow [] [] = True
+                                 nextRow (x:xs) (c:cs) = checkRowClue x c && nextRow xs cs 
+                             in nextRow board clues
+
+-- reverse rows in board
+reverseRowsInBoard :: Board -> Board
+reverseRowsInBoard board = let reverseRow [] = []
+                               reverseRow (x:xs) = reverse x : reverseRow xs
+                           in reverseRow board
+
+-- sprawdz wszystkie wskazowki z prawej strony -> odwroc wiersze i sprawdz jak z lewej
+checkRightClues :: Board -> [Clue] -> Bool
+checkRightClues board clues = checkLeftClues (reverseRowsInBoard board) clues
+                             
+
+-- sprawdz wszystkie wskazowki z gory -> transpozycja planszy i sprawdz jak z lewej
+checkUpperClues :: Board -> [Clue] -> Bool
+checkUpperClues board clues = checkLeftClues (transpose board) clues
+
+-- sprawdz wszystkie wskazowki z dolu -> transpozycja planszy + odwroc wiersze i sprawdz jak z lewej
+checkBottomClues :: Board -> [Clue] -> Bool 
+checkBottomClues board clues = checkLeftClues (reverseRowsInBoard (transpose board)) clues
 
 -- stworz pustą plansze o zadanym rozmiarze
 createEmptyBoard :: Int -> Board
@@ -12,31 +61,36 @@ createEmptyBoard size | size <= 0 = error "Invalid board size"
 numTimesFound :: (Eq a) => a -> [a] -> Int
 numTimesFound x xs = (length . filter (== x)) xs
 
-
 -- transpozycja planszy - kolumny do rzedow
 transpose :: [[a]] -> [[a]]
 transpose [] = []
 transpose ([]:xs)   = transpose xs
-transpose ((x:xs):xss) = (x:[ h | (h:_) <- xss]):transpose (xs:[ t | (_:t) <- xss])
+transpose ((x:xs):xss) = (x:[ h | (h:_) <- xss ]):transpose (xs:[ t | (_:t) <- xss ])
 
-
+-- czy dany wiersz planszy jest poprawny
 isRowValid :: [Cell] -> Bool
 isRowValid [] = True
 isRowValid row = iterOverRow row row
                  where iterOverRow og [] = True
                        iterOverRow og (x:xs) = if x == 0 then iterOverRow og xs else numTimesFound x og == 1 && iterOverRow og xs
 
+-- sprawdz poprawnosc wierszy planszy
 checkRowsForUniqueness :: Board -> Bool
 checkRowsForUniqueness board = nextRow board (size - 1)
                                where size = length board
                                      nextRow board 0 = isRowValid (board !! 0)
                                      nextRow board index = isRowValid (board !! index) && nextRow board (index - 1)
                                  
--- sprawdz czy dana plansza jest poprawna, na razie dummy check
-isValidBoard :: Board -> Bool 
-isValidBoard board = let areRowsValid = checkRowsForUniqueness board
-                         areColsValid = checkRowsForUniqueness (transpose board) 
-                     in areRowsValid && areColsValid
+-- sprawdz czy dana plansza jest poprawna, na razie wartosci unikalne w wierszach i kolumnach
+isValidBoard :: Board -> CluesSet -> Bool 
+isValidBoard board (Clues u r b l) = let areRowsValid = checkRowsForUniqueness board
+                                         areColsValid = checkRowsForUniqueness (transpose board) 
+                                         areLeftCluesMet = checkLeftClues board l
+                                         areRightCluesMet = checkRightClues board r
+                                         areUpperCluesMet = checkUpperClues board u
+                                         areBottomCluesMet = checkBottomClues board b
+                                         areCluesMet = areLeftCluesMet && areRightCluesMet && areUpperCluesMet && areBottomCluesMet
+                                     in areRowsValid && areColsValid && areCluesMet
 
 -- oblicz nastepny wymieniany element
 nextPosition :: Int -> (Int, Int) -> (Int, Int)
@@ -62,16 +116,16 @@ createPossibleBoards board position = createNext board position (length board)
                                             createNext board pos n = [replaceValueInBoard board pos n] ++ createNext board pos (n-1) 
 
 -- stworz liste mozliwych rozwiazan
-fillSquare :: Board -> (Int, Int) -> [Board]
-fillSquare board (row, column) = let size = length board
-                                 in if row == size then [board]
-                                 else let nextCell = nextPosition size (row, column)
-                                          nextBoards = createPossibleBoards board (row, column) 
-                                          checkNextBoard [] = []
-                                          checkNextBoard (x:xs) = (if isValidBoard x then fillSquare x nextCell else []) ++ checkNextBoard xs
-                                 in checkNextBoard nextBoards 
+fillSquare :: Board -> CluesSet -> (Int, Int) -> [Board]
+fillSquare board clues (row, column) = let size = length board
+                                       in if row == size then [board]
+                                          else let nextCell = nextPosition size (row, column)
+                                                   nextBoards = createPossibleBoards board (row, column) 
+                                                   checkNextBoard [] = []
+                                                   checkNextBoard (x:xs) = (if isValidBoard x clues then fillSquare x clues nextCell else []) ++ checkNextBoard xs
+                                               in checkNextBoard nextBoards 
 
-
+-- main - pobierz plansze od użytkownika i rozwiąż łamigłówkę
 main :: IO ()
 main = do
     putStrLn "SPOP-Projekt: Piramidy"
@@ -79,5 +133,7 @@ main = do
     line <- getLine
     let size = (read (takeWhile (/= ' ') line) :: Int)
     let board = createEmptyBoard size
-    let solutions = fillSquare board (0,0) -- zacznij od elementu (0,0) 
+    -- let clues = Clues [Just 3, Nothing, Just 1, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Nothing, Nothing, Nothing] [Nothing, Nothing, Just 4, Nothing]
+    let clues = Clues [Nothing, Nothing, Nothing, Nothing] [Nothing, Just 3, Nothing, Nothing] [Nothing, Just 2, Nothing, Just 2] [Nothing, Nothing, Just 4, Nothing]
+    let solutions = fillSquare board clues (0,0) -- zacznij od elementu (0,0) 
     print solutions
