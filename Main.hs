@@ -8,9 +8,35 @@ createEmptyBoard :: Int -> Board
 createEmptyBoard size | size <= 0 = error "Invalid board size"
                       | otherwise = [ [ 0 | x <- [1..size] ] | y <- [1..size] ] 
 
+-- ile razy element wystepuje w liscie
+numTimesFound :: (Eq a) => a -> [a] -> Int
+numTimesFound x xs = (length . filter (== x)) xs
+
+
+-- transpozycja planszy - kolumny do rzedow
+transpose :: [[a]] -> [[a]]
+transpose [] = []
+transpose ([]:xs)   = transpose xs
+transpose ((x:xs):xss) = (x:[ h | (h:_) <- xss]):transpose (xs:[ t | (_:t) <- xss])
+
+
+isRowValid :: [Cell] -> Bool
+isRowValid [] = True
+isRowValid row = iterOverRow row row
+                 where iterOverRow og [] = True
+                       iterOverRow og (x:xs) = if x == 0 then iterOverRow og xs else numTimesFound x og == 1 && iterOverRow og xs
+
+checkRowsForUniqueness :: Board -> Bool
+checkRowsForUniqueness board = nextRow board (size - 1)
+                               where size = length board
+                                     nextRow board 0 = isRowValid (board !! 0)
+                                     nextRow board index = isRowValid (board !! index) && nextRow board (index - 1)
+                                 
 -- sprawdz czy dana plansza jest poprawna, na razie dummy check
 isValidBoard :: Board -> Bool 
-isValidBoard board = (board !! 0) !! 0 == 1
+isValidBoard board = let areRowsValid = checkRowsForUniqueness board
+                         areColsValid = checkRowsForUniqueness (transpose board) 
+                     in areRowsValid && areColsValid
 
 -- oblicz nastepny wymieniany element
 nextPosition :: Int -> (Int, Int) -> (Int, Int)
